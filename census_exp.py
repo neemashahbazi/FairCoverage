@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import cvxpy as cp
 import time
 from copy import deepcopy
-from scipy.sparse import csr_matrix
 
 
 def read_census(columns, n):
@@ -27,7 +26,6 @@ def run_dp(data, demands):
     ]
     dp[0][0][0][0] = 0
     for i in range(0, n):
-        # print(i, end="%\n")
         key = tuple(data.iloc[i][:-1])
         for j in range(demands[0] + 3):
             for k in range(demands[1] + 3):
@@ -80,7 +78,6 @@ def run_greedy(dic, demands):
     while not is_finished(demands):
         key = find_best(dic, demands)
         if not key:
-            # print("Demands Were Not Satisfied :(")
             return None
         value = dic[key][0]
         res += value
@@ -108,32 +105,25 @@ def run_cp(dic2, demands):
     n = len(demands)
     m = len(all_keys)
 
-    x = cp.Variable(m)  # how many times to use each set (continuous)
-    cost_vars = []  # to accumulate total cost
+    x = cp.Variable(m)
+    cost_vars = []
     constraints = []
 
     for j in range(m):
         k_max = cnt[j]
-        lambdas = cp.Variable(k_max + 1, nonneg=True)  # convex weights
+        lambdas = cp.Variable(k_max + 1, nonneg=True)
         k_vals = np.arange(k_max + 1)
         f_vals = np.array(convex_functions[j])
 
-        # x[j] = sum_k k * lambda_k
         constraints.append(x[j] == k_vals @ lambdas)
-
-        # sum_k lambda_k == 1
         constraints.append(cp.sum(lambdas) == 1)
-
-        # cost = sum_k f(k) * lambda_k
         cost = f_vals @ lambdas
         cost_vars.append(cost)
 
-    # Coverage constraints
     for i in range(n):
         coverage = sum(x[j] * all_keys[j][i] for j in range(m))
         constraints.append(coverage >= demands[i])
 
-    # Objective: minimize total cost
     total_cost = cp.sum(cost_vars)
     problem = cp.Problem(cp.Minimize(total_cost), constraints)
     problem.solve()
@@ -168,108 +158,106 @@ def construct_priority_queues(data):
         key = tuple(row[:-1])
         priority = row["weight"]
         dic[key].append(priority)
-        # if h % 50000 == 0:
-        # print(int(h / len(data) * 100), end="%\n")
     for key in dic.keys():
         dic[key].sort()
     return dic
 
 
-columns = ["iSex", "dPoverty", "dAge"]
-lp_construction_time_avg = []
-dp_construction_time_avg = []
-greedy_construction_time_avg = []
-cp_construction_time_avg = []
+# columns = ["iSex", "dPoverty", "dAge"]
+# lp_construction_time_avg = []
+# dp_construction_time_avg = []
+# greedy_construction_time_avg = []
+# cp_construction_time_avg = []
 
-res_dp_list_avg = []
-res_greedy_list_avg = []
-res_lp_list_avg = []
-res_cp_list_avg = []
+# res_dp_list_avg = []
+# res_greedy_list_avg = []
+# res_lp_list_avg = []
+# res_cp_list_avg = []
 
-demands_org = [np.random.randint(1, 53) for col in columns]
-range_n = range(10, 22)
-n_values = [2**i for i in range_n]
-for n in n_values:
-    print("n: ", n)
-    data = read_census(columns, n)
-    res_dp_list = []
-    res_greedy_list = []
-    res_lp_list = []
-    res_cp_list = []
-    dp_construction_time = []
-    lp_construction_time = []
-    greedy_construction_time = []
-    cp_construction_time = []
-    for i in range(1):
-        print("run:", i + 1)
-        dic = construct_priority_queues(data)
-        dic2 = deepcopy(dic)
-        demands = deepcopy(demands_org)
-        start_time = time.time()
-        res_lp = run_lp(data, demands)
-        end_time = time.time()
-        lp_construction_time.append(end_time - start_time)
-        res_lp_list.append(res_lp)
+# demands_org = [np.random.randint(1, 53) for col in columns]
+# range_n = range(10, 22)
+# n_values = [2**i for i in range_n]
+# for n in n_values:
+#     print("n: ", n)
+#     data = read_census(columns, n)
+#     res_dp_list = []
+#     res_greedy_list = []
+#     res_lp_list = []
+#     res_cp_list = []
+#     dp_construction_time = []
+#     lp_construction_time = []
+#     greedy_construction_time = []
+#     cp_construction_time = []
+#     for i in range(1):
+#         print("run:", i + 1)
+#         dic = construct_priority_queues(data)
+#         dic2 = deepcopy(dic)
+#         demands = deepcopy(demands_org)
+#         start_time = time.time()
+#         res_lp = run_lp(data, demands)
+#         end_time = time.time()
+#         lp_construction_time.append(end_time - start_time)
+#         res_lp_list.append(res_lp)
 
-        # start_time = time.time()
-        # res_dp = run_dp(data, demands)
-        # end_time = time.time()
-        # dp_construction_time.append(end_time - start_time)
-        # res_dp_list.append(res_dp)
+#         # start_time = time.time()
+#         # res_dp = run_dp(data, demands)
+#         # end_time = time.time()
+#         # dp_construction_time.append(end_time - start_time)
+#         # res_dp_list.append(res_dp)
 
-        start_time = time.time()
-        res_cp = run_cp(dic2, demands)
-        end_time = time.time()
-        cp_construction_time.append(end_time - start_time)
-        res_cp_list.append(res_cp)
+#         start_time = time.time()
+#         res_cp = run_cp(dic2, demands)
+#         end_time = time.time()
+#         cp_construction_time.append(end_time - start_time)
+#         res_cp_list.append(res_cp)
 
-        start_time = time.time()
-        res_greedy = run_greedy(dic, demands)
-        end_time = time.time()
-        res_greedy_list.append(res_greedy)
-        greedy_construction_time.append(end_time - start_time)
+#         start_time = time.time()
+#         res_greedy = run_greedy(dic, demands)
+#         end_time = time.time()
+#         res_greedy_list.append(res_greedy)
+#         greedy_construction_time.append(end_time - start_time)
 
-    lp_construction_time_avg.append(np.mean(lp_construction_time))
-    dp_construction_time_avg.append(np.mean(dp_construction_time))
-    greedy_construction_time_avg.append(np.mean(greedy_construction_time))
-    cp_construction_time_avg.append(np.mean(cp_construction_time))
+#     lp_construction_time_avg.append(np.mean(lp_construction_time))
+#     # dp_construction_time_avg.append(np.mean(dp_construction_time))
+#     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
+#     cp_construction_time_avg.append(np.mean(cp_construction_time))
 
-    res_lp_list_avg.append(np.mean(res_lp_list))
-    res_dp_list_avg.append(np.mean(res_dp_list))
-    res_greedy_list_avg.append(np.mean(res_greedy_list))
-    res_cp_list_avg.append(np.mean(res_cp_list))
-
-
-plt.figure(figsize=(10, 6))
-plt.rcParams.update({"font.size": 20})
-plt.plot(n_values, lp_construction_time_avg, label="LP", marker="o")
-# plt.plot(n_values, dp_construction_time_avg, label="DP", marker="s")
-plt.plot(n_values, greedy_construction_time_avg, label="Greedy", marker="^")
-plt.plot(n_values, cp_construction_time_avg, label="CP", marker="X")
-plt.xticks(n_values, labels=[r"$2^{{{}}}$".format(i) for i in range_n])
-plt.xlabel("Number of Records")
-plt.ylabel("Average Construction Time (sec)")
-plt.xscale("log")
-plt.yscale("log")
-plt.legend()
-plt.grid(True)
-plt.savefig("plot/time_varying_n.png", bbox_inches="tight")
+#     res_lp_list_avg.append(np.mean(res_lp_list))
+#     # res_dp_list_avg.append(np.mean(res_dp_list))
+#     res_greedy_list_avg.append(np.mean(res_greedy_list))
+#     res_cp_list_avg.append(np.mean(res_cp_list))
 
 
-plt.figure(figsize=(10, 6))
-plt.rcParams.update({"font.size": 20})
-x = np.arange(len(n_values))
-width = 0.25
-# plt.bar(x - width, res_dp_list_avg, width, label="DP", color="green")
-plt.bar(x, res_greedy_list_avg, width, label="Greedy", color="orange")
-plt.bar(x + width, res_lp_list_avg, width, label="LP", color="blue")
-plt.bar(x + 2 * width, res_cp_list_avg, width, label="CP", color="green")
-plt.xticks(x, labels=[r"$2^{{{}}}$".format(i) for i in range_n])
-plt.xlabel("Number of Records")
-plt.ylabel("Total Weight")
-plt.legend()
-plt.grid(True, axis="y", linestyle="--", alpha=0.7)
-plt.savefig("plot/comparison_varying_n.png", bbox_inches="tight")
+# plt.figure(figsize=(10, 6))
+# plt.rcParams.update({"font.size": 20})
+# plt.plot(n_values, lp_construction_time_avg, label="LP", marker="o")
+# # plt.plot(n_values, dp_construction_time_avg, label="DP", marker="s")
+# plt.plot(n_values, greedy_construction_time_avg, label="Greedy", marker="^")
+# plt.plot(n_values, cp_construction_time_avg, label="CP", marker="X")
+# plt.xticks(n_values, labels=[r"$2^{{{}}}$".format(i) for i in range_n])
+# plt.xlabel("Number of Records")
+# plt.ylabel("Average Construction Time (sec)")
+# plt.xscale("log")
+# plt.yscale("log")
+# plt.legend()
+# plt.grid(True)
+# plt.savefig("plot/time_varying_n.png", bbox_inches="tight")
+
+
+# plt.figure(figsize=(10, 6))
+# plt.rcParams.update({"font.size": 20})
+# x = np.arange(len(n_values))
+# width = 0.25
+# # plt.bar(x - width, res_dp_list_avg, width, label="DP", color="green")
+# plt.bar(x, res_greedy_list_avg, width, label="Greedy", color="orange")
+# plt.bar(x + width, res_lp_list_avg, width, label="LP", color="blue")
+# plt.bar(x + 2 * width, res_cp_list_avg, width, label="CP", color="green")
+# plt.xticks(x, labels=[r"$2^{{{}}}$".format(i) for i in range_n])
+# plt.xlabel("Number of Records")
+# plt.ylabel("Total Weight")
+# plt.legend()
+# plt.grid(True, axis="y", linestyle="--", alpha=0.7)
+# plt.savefig("plot/comparison_varying_n.png", bbox_inches="tight")
 
 
 all_columns = [
@@ -395,12 +383,12 @@ for num_group in num_groups:
         greedy_construction_time.append(end_time - start_time)
 
     lp_construction_time_avg.append(np.mean(lp_construction_time))
-    dp_construction_time_avg.append(np.mean(dp_construction_time))
+    # dp_construction_time_avg.append(np.mean(dp_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     cp_construction_time_avg.append(np.mean(cp_construction_time))
 
     res_lp_list_avg.append(np.mean(res_lp_list))
-    res_dp_list_avg.append(np.mean(res_dp_list))
+    # res_dp_list_avg.append(np.mean(res_dp_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_cp_list_avg.append(np.mean(res_cp_list))
 
