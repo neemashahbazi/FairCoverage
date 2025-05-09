@@ -177,3 +177,5 @@ cython_debug/
 /data
 .data
 data/
+
+.DS_Store
