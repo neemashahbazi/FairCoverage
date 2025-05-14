@@ -89,6 +89,243 @@ def run_greedy(dic, demands):
 
 
 def run_cp(dic2, demands):
+    # all_keys = list(dic2.keys())
+    # convex_functions = []
+    # cnt = []
+    # for key in all_keys:
+    #     cur_q = dic2[key]
+    #     ps = 0
+    #     curr_f = [0]
+    #     for x in cur_q:
+    #         ps += x
+    #         curr_f.append(ps)
+    #     convex_functions.append(curr_f)
+    #     cnt.append(len(curr_f) - 1)
+
+    # n = len(demands)
+    # m = len(all_keys)
+
+    # x = cp.Variable(m)
+    # cost_vars = []
+    # constraints = []
+
+    # for j in range(m):
+    #     k_max = cnt[j]
+    #     lambdas = cp.Variable(k_max + 1, nonneg=True)
+    #     k_vals = np.arange(k_max + 1)
+    #     f_vals = np.array(convex_functions[j])
+
+    #     constraints.append(x[j] == k_vals @ lambdas)
+    #     constraints.append(cp.sum(lambdas) == 1)
+    #     cost = f_vals @ lambdas
+    #     cost_vars.append(cost)
+
+    # for i in range(n):
+    #     coverage = sum(x[j] * all_keys[j][i] for j in range(m))
+    #     constraints.append(coverage >= demands[i])
+
+    # total_cost = cp.sum(cost_vars)
+    # problem = cp.Problem(cp.Minimize(total_cost), constraints)
+    # problem.solve()
+
+    # if problem.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+    #     raise RuntimeError("Solver failed.")
+
+    # return problem.value
+    return 0
+
+import warnings
+
+
+def fit_quadratic(f_list):
+    """
+    Fits a quadratic polynomial to each piecewise linear array in f_list.
+    Returns a list of coefficient tuples (a, b, c) for each g_i(x) = ax^2 + bx + c.
+    """
+    coeffs = []
+    for f in f_list:
+        x = np.arange(len(f))
+        y = np.array(f)
+        try:
+           with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                a, b, c = np.polyfit(x, y, deg=2)
+                tt = a + b + c
+                if int(tt) < 0:
+                    coeffs.append((max(a, 0), max(0, 0), max(0, 0)))
+                else:
+                    coeffs.append((a, 0, 0))
+        except:  
+            coeffs.append((max(a, 0), max(0, 0), max(0, 0)))
+    return coeffs
+
+def fit_quadratic_upper_bounds(f_list):
+    """
+    Fits a convex quadratic function g_i(t) = a t^2 + b t + c
+    such that g_i(t) >= f_i(t) for all integer t in [0, len(f_i) - 1],
+    and a >= 0 to ensure convexity.
+
+    Returns: List of (a, b, c) tuples
+    """
+    coeffs = []
+
+    for f in f_list:
+        k = len(f)
+        t_vals = np.arange(k)
+
+        # Variables: coefficients of the quadratic function
+        a = cp.Variable()
+        b = cp.Variable()
+        c = cp.Variable()
+
+        # Quadratic function values at integer points
+        g_vals = a * t_vals**2 + b * t_vals + c
+
+        # Constraints: g(t) >= f(t) for all t, and a >= 0
+        constraints = []
+
+        # Objective: minimize the sum of excess over f
+        objective = cp.Minimize(cp.sum((g_vals - f)**2))
+
+        prob = cp.Problem(objective, constraints)
+        prob.solve(solver=cp.ECOS)  # Explicitly set a reliable solver
+
+        if prob.status not in ["optimal", "optimal_inaccurate"]:
+            raise ValueError(f"Solver failed on function: {f}")
+
+        coeffs.append((a.value, b.value, c.value))
+
+    return coeffs
+
+def plot_twist(f):
+    cof = fit_quadratic(f)[0]
+    print(cof)
+    tt = cof[0] + cof[1] + cof[2]
+    print(int(tt))
+    
+    # Print polynomial
+    print("Approximating quadratic polynomial:")  
+
+    # Plot original and approximated function
+    x = np.linspace(0, len(f) - 1, 100)
+    plt.plot(range(len(f[0])), f[0], 'o', label='Original f')
+    plt.plot(range(len(f[0])), [cof[0] * x ** 2 + cof[1] * x + cof[2] for x in range(len(f[0]))], '-', label='Quadratic Approximation')
+    plt.legend()
+    plt.title("Quadratic Approximation of Convex Function")
+    plt.grid(True)
+    plt.show()
+    plt.savefig("plot/plot_twist.png", bbox_inches="tight")
+
+
+# def run_twist(dic2, demands):
+#     all_keys = list(dic2.keys())
+#     convex_functions = []
+#     cnt = []
+#     for key in all_keys:
+#         cur_q = dic2[key]
+#         ps = 0
+#         curr_f = [0]
+#         for x in cur_q:
+#             ps += x
+#             curr_f.append(ps)
+#         convex_functions.append(curr_f)
+#         cnt.append(len(curr_f) - 1)
+        
+    
+#     #plot_twist(convex_functions)
+    
+#     coeffs = fit_quadratic(convex_functions)
+
+#     m = len(all_keys)
+#     n = len(demands)
+
+#     x = cp.Variable(m)  # x_i: how many times to use set i
+
+#     # Objective function
+#     objective = cp.Minimize(
+#         sum(a * cp.square(x[i]) + b * x[i] + c for i, (a, b, c) in enumerate(coeffs))
+#     )
+
+#     # Constraints
+#     constraints = [x >= 0, x <= cnt]
+
+#     # Coverage constraints
+#     for j in range(n):
+#         coverage = sum(all_keys[i][j] * x[i] for i in range(m))
+#         constraints.append(coverage >= demands[j])
+
+#     # Solve the problem
+#     prob = cp.Problem(objective, constraints)
+#     prob.solve()
+#     vals = x.value
+#     optan = 0
+    
+#     for i in range(len(convex_functions)):
+#         val = vals[i]
+#         rnded = int(round(val))
+#         rnded = min(rnded, len(convex_functions[i]) - 1)
+#         optan += convex_functions[i][rnded]
+
+#     return optan
+
+def calc_pwl(functions, demands, all_keys):
+    # Check the cnt
+    max_parts = 200
+    base_log = 2**6
+    max_size = 10000000
+    
+    max_demand = []
+    for key in all_keys:
+        max_tmp = 0
+        for i in range(len(demands)):
+            if key[i] == 0:
+                continue
+            max_tmp = max(max_tmp, demands[i])
+        max_demand.append(max_tmp)
+    
+    default_x_list = [0]
+    lst_add = 1
+    lst_ind = 0
+    curr_cnt = base_log
+    while lst_ind < max_size:
+        for i in range(curr_cnt):
+            lst_ind += lst_add
+            default_x_list.append(lst_ind)
+            
+        if curr_cnt > 1:
+            curr_cnt //= 2
+        lst_add *= 2
+
+    knots_x_list = []
+    knots_y_list = []
+    for i in range(len(functions)):
+        func = functions[i]
+        curr_dems = max_demand[i]
+        curr_size = min(len(func), curr_dems + 1)
+        curr_func = deepcopy(func[: curr_size])
+
+        pt = 0
+        lst = default_x_list[pt]
+        curr_x = []
+        curr_y = []
+        while lst < curr_size - 1:
+            curr_x.append(lst)
+            curr_y.append(curr_func[lst])
+
+            pt = pt + 1
+            lst = default_x_list[pt]
+            
+        curr_x.append(curr_size - 1)
+        curr_y.append(curr_func[-1])
+        knots_x_list.append(curr_x)
+        knots_y_list.append(curr_y)
+        
+    return knots_x_list, knots_y_list 
+             
+    
+
+
+def run_twist(dic2, demands):
     all_keys = list(dic2.keys())
     convex_functions = []
     cnt = []
@@ -101,38 +338,86 @@ def run_cp(dic2, demands):
             curr_f.append(ps)
         convex_functions.append(curr_f)
         cnt.append(len(curr_f) - 1)
-
+    #plot_twist(convex_functions)
+    
+    knots_x_list, knots_y_list = calc_pwl(convex_functions, demands, all_keys)
     n = len(demands)
-    m = len(all_keys)
-
-    x = cp.Variable(m)
-    cost_vars = []
+    m = len(cnt)
+    
+    x = [cp.Variable() for i in range(m)]
+    
+    # Objective: Minimize sum of piecewise linear approximations of ps[i]
+    cost_terms = []
+    for i in range(m):
+        # Get knots for set i
+        knots_x = knots_x_list[i]
+        knots_y = knots_y_list[i]
+        num_knots = len(knots_x)
+        
+        # Ensure knots are valid
+        if len(knots_y) != num_knots or num_knots < 2:
+            print(i)
+            print(all_keys[i])
+            print(knots_x)
+            print(knots_y)
+            raise ValueError(f"Invalid knots for set {i}: need at least 2 knots, got {num_knots}")
+        
+        # Compute slopes and intercepts for each segment
+        slopes = []
+        intercepts = []
+        for k in range(num_knots - 1):
+            x1, x2 = knots_x[k], knots_x[k + 1]
+            y1, y2 = knots_y[k], knots_y[k + 1]
+            if x2 <= x1:
+                raise ValueError(f"Knots_x for set {i} must be strictly increasing")
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
+            slopes.append(slope)
+            intercepts.append(intercept)
+        
+        # Piecewise linear function is max of linear functions: slope_k * x + intercept_k
+        linear_terms = [slope * x[i] + intercept for slope, intercept in zip(slopes, intercepts)]
+        # Approximate cost is max of these linear functions
+        cost_i = cp.maximum(*linear_terms)
+        cost_terms.append(cost_i)
+    
+    objective = cp.Minimize(cp.sum(cost_terms))
+    
+    # Constraints
     constraints = []
-
-    for j in range(m):
-        k_max = cnt[j]
-        lambdas = cp.Variable(k_max + 1, nonneg=True)
-        k_vals = np.arange(k_max + 1)
-        f_vals = np.array(convex_functions[j])
-
-        constraints.append(x[j] == k_vals @ lambdas)
-        constraints.append(cp.sum(lambdas) == 1)
-        cost = f_vals @ lambdas
-        cost_vars.append(cost)
-
-    for i in range(n):
-        coverage = sum(x[j] * all_keys[j][i] for j in range(m))
-        constraints.append(coverage >= demands[i])
-
-    total_cost = cp.sum(cost_vars)
-    problem = cp.Problem(cp.Minimize(total_cost), constraints)
-    problem.solve()
-
-    if problem.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
-        raise RuntimeError("Solver failed.")
-
-    return problem.value
-
+    # Bounds: 0 <= x[i] <= cnt[i]
+    for i in range(m):
+        constraints.append(x[i] >= 0)
+        constraints.append(x[i] <= cnt[i])
+    
+    # Demand satisfaction: for each element j, sum of sets covering j meets demand[j]
+    for j in range(n):
+        coverage = cp.sum([x[i] * all_keys[i][j] for i in range(m)])
+        constraints.append(coverage >= demands[j])
+    
+    # Formulate and solve the problem
+    problem = cp.Problem(objective, constraints)
+    
+    # Use a solver for continuous problems (e.g., ECOS, SCS, or default)
+    try:
+        problem.solve(solver=cp.ECOS, verbose=True)
+    except cp.SolverError as e:
+        print(f"Solver error: {e}")
+        return None, None
+    
+    # Check if solution exists
+    if problem.status != cp.OPTIMAL:
+        print(f"Problem status: {problem.status}")
+        return None, None
+    
+    # Extract solution
+    solution = [x[i].value for i in range(m)]
+    optimal_cost = problem.value
+    
+    return optimal_cost
+    
+    
+    
 
 def run_lp(data, demands):
     n = len(data)
@@ -175,7 +460,7 @@ def construct_priority_queues(data):
 # res_cp_list_avg = []
 
 # demands_org = [np.random.randint(1, 53) for col in columns]
-# range_n = range(10, 22)
+# range_n = range(10, 21)
 # n_values = [2**i for i in range_n]
 # for n in n_values:
 #     print("n: ", n)
@@ -334,12 +619,15 @@ lp_construction_time_avg = []
 dp_construction_time_avg = []
 greedy_construction_time_avg = []
 cp_construction_time_avg = []
+twist_construction_time_avg = []
 res_dp_list_avg = []
 res_greedy_list_avg = []
 res_lp_list_avg = []
 res_cp_list_avg = []
+res_twist_list_avg = []
+
 demands_org = [np.random.randint(1, 53) for col in all_columns]
-num_groups = range(3, 69, 5)
+num_groups = range(3, 22, 5)
 for num_group in num_groups:
     columns = all_columns[0:num_group]
     print("n_groups: ", num_group)
@@ -348,10 +636,13 @@ for num_group in num_groups:
     res_greedy_list = []
     res_lp_list = []
     res_cp_list = []
+    res_twist_list = []
     dp_construction_time = []
     lp_construction_time = []
     cp_construction_time = []
     greedy_construction_time = []
+    twist_construction_time = []
+
     for i in range(1):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
@@ -369,6 +660,13 @@ for num_group in num_groups:
         end_time = time.time()
         cp_construction_time.append(end_time - start_time)
         res_cp_list.append(res_cp)
+        
+        start_time = time.time()
+        res_twist = run_twist(dic2, demands)
+        #res_twist = 0
+        end_time = time.time()
+        twist_construction_time.append(end_time - start_time)
+        res_twist_list.append(res_twist)
 
         # start_time = time.time()
         # res_dp = run_dp(data, demands)
@@ -386,11 +684,15 @@ for num_group in num_groups:
     # dp_construction_time_avg.append(np.mean(dp_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     cp_construction_time_avg.append(np.mean(cp_construction_time))
+    twist_construction_time_avg.append(np.mean(twist_construction_time))
+
 
     res_lp_list_avg.append(np.mean(res_lp_list))
     # res_dp_list_avg.append(np.mean(res_dp_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_cp_list_avg.append(np.mean(res_cp_list))
+    res_twist_list_avg.append(np.mean(res_twist_list))
+
 
 plt.figure(figsize=(10, 6))
 plt.rcParams.update({"font.size": 20})
@@ -398,6 +700,8 @@ plt.plot(num_groups, lp_construction_time_avg, label="LP", marker="o")
 # plt.plot(n_values, dp_construction_time_avg, label="DP", marker="s")
 plt.plot(num_groups, greedy_construction_time_avg, label="Greedy", marker="^")
 plt.plot(num_groups, cp_construction_time_avg, label="CP", marker="X")
+plt.plot(num_groups, twist_construction_time_avg, label="Twist", marker="x")
+
 
 plt.xticks(num_groups)
 plt.xlabel("Number of Groups")
@@ -412,6 +716,7 @@ plt.rcParams.update({"font.size": 20})
 x = np.arange(len(num_groups))
 width = 0.25
 # plt.bar(x - width, res_dp_list_avg, width, label="DP", color="green")
+plt.bar(x - width, res_twist_list_avg, width, label="Twist", color="red")
 plt.bar(x, res_greedy_list_avg, width, label="Greedy", color="orange")
 plt.bar(x + width, res_lp_list_avg, width, label="LP", color="blue")
 plt.bar(x + 2 * width, res_cp_list_avg, width, label="CP", color="green")
