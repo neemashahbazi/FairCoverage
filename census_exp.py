@@ -271,7 +271,7 @@ def plot_twist(f):
 def calc_pwl(functions, demands, all_keys):
     # Check the cnt
     max_parts = 200
-    base_log = 2**6
+    base_log = 2**4
     max_size = 10000000
     
     max_demand = []
@@ -281,7 +281,7 @@ def calc_pwl(functions, demands, all_keys):
             if key[i] == 0:
                 continue
             max_tmp = max(max_tmp, demands[i])
-        max_demand.append(max_tmp)
+        max_demand.append(max_tmp + 1)
     
     default_x_list = [0]
     lst_add = 1
@@ -325,7 +325,7 @@ def calc_pwl(functions, demands, all_keys):
     
 
 
-def run_twist(dic2, demands):
+def run_twist1(dic2, demands):
     all_keys = list(dic2.keys())
     convex_functions = []
     cnt = []
@@ -377,8 +377,10 @@ def run_twist(dic2, demands):
         
         # Piecewise linear function is max of linear functions: slope_k * x + intercept_k
         linear_terms = [slope * x[i] + intercept for slope, intercept in zip(slopes, intercepts)]
-        # Approximate cost is max of these linear functions
-        cost_i = cp.maximum(*linear_terms)
+        if len(linear_terms) == 1:
+            cost_i = linear_terms[0]
+        else:
+            cost_i = cp.maximum(*linear_terms)
         cost_terms.append(cost_i)
     
     objective = cp.Minimize(cp.sum(cost_terms))
@@ -400,7 +402,8 @@ def run_twist(dic2, demands):
     
     # Use a solver for continuous problems (e.g., ECOS, SCS, or default)
     try:
-        problem.solve(solver=cp.ECOS, verbose=True)
+        #problem.solve(solver=cp.ECOS, verbose=True)
+        problem.solve()
     except cp.SolverError as e:
         print(f"Solver error: {e}")
         return None, None
@@ -413,10 +416,88 @@ def run_twist(dic2, demands):
     # Extract solution
     solution = [x[i].value for i in range(m)]
     optimal_cost = problem.value
-    
+    print(optimal_cost)
     return optimal_cost
+
+import pulp
     
+def run_twist(dic2, demands):
+    all_keys = list(dic2.keys())
+    convex_functions = []
+    cnt = []
+    for key in all_keys:
+        cur_q = dic2[key]
+        ps = 0
+        curr_f = [0]
+        for x in cur_q:
+            ps += x
+            curr_f.append(ps)
+        convex_functions.append(curr_f)
+        cnt.append(len(curr_f) - 1)
+    #plot_twist(convex_functions)
     
+    knots_x_list, knots_y_list = calc_pwl(convex_functions, demands, all_keys)
+    n = len(demands)
+    m = len(cnt)
+    
+    prob = pulp.LpProblem("Set_Multicover", pulp.LpMinimize)
+    
+    # Decision variables: x[i] is the number of copies of set i (continuous)
+    x = [pulp.LpVariable(f"x_{i}", lowBound=0, upBound=cnt[i], cat="Continuous") for i in range(m)]
+    
+    # Auxiliary variables for PWL costs: z[i] represents cost of set i
+    z = [pulp.LpVariable(f"z_{i}", lowBound=0, cat="Continuous") for i in range(m)]
+    
+    # Objective: Minimize sum of z[i]
+    prob += pulp.lpSum(z)
+    
+    # Constraints
+    # PWL cost constraints
+    for i in range(m):
+        knots_x = knots_x_list[i]
+        knots_y = knots_y_list[i]
+        num_knots = len(knots_x)
+        
+        # Validate knots
+        if len(knots_y) != num_knots or num_knots < 2:
+            raise ValueError(f"Invalid knots for set {i}: need at least 2 knots, got {num_knots}")
+        
+        # Compute slopes and intercepts
+        for k in range(num_knots - 1):
+            x1, x2 = knots_x[k], knots_x[k + 1]
+            y1, y2 = knots_y[k], knots_y[k + 1]
+            if x2 <= x1:
+                raise ValueError(f"Knots_x for set {i} must be strictly increasing")
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
+            # Constraint: z[i] >= slope * x[i] + intercept
+            prob += z[i] >= slope * x[i] + intercept, f"cost_constraint_{i}_{k}"
+    
+    # Demand satisfaction constraints
+    for j in range(n):
+        prob += (
+            pulp.lpSum(x[i] * all_keys[i][j] for i in range(m)) >= demands[j],
+            f"demand_{j}"
+        )
+    
+    # Solve the problem
+    try:
+        prob.solve(pulp.PULP_CBC_CMD(msg=1))
+    except Exception as e:
+        print(f"Solver error: {e}")
+        return None, None
+    
+    # Check if solution exists
+    if prob.status != pulp.LpStatusOptimal:
+        print(f"Problem status: {pulp.LpStatus[prob.status]}")
+        return None, None
+    
+    # Extract solution
+    solution = [x[i].varValue for i in range(m)]
+    optimal_cost = pulp.value(prob.objective)
+
+    print(optimal_cost)
+    return optimal_cost
     
 
 def run_lp(data, demands):
@@ -627,7 +708,7 @@ res_cp_list_avg = []
 res_twist_list_avg = []
 
 demands_org = [np.random.randint(1, 53) for col in all_columns]
-num_groups = range(3, 22, 5)
+num_groups = range(3, 22, 2)
 for num_group in num_groups:
     columns = all_columns[0:num_group]
     print("n_groups: ", num_group)
