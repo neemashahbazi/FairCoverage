@@ -178,5 +178,11 @@ cython_debug/
 /data
 .data
 data/
+plot/
+.plot/
+/plot
+dump/
+/dump
+.dump
 
 .DS_Store

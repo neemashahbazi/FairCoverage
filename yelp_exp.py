@@ -10,10 +10,11 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
 plt.rcParams["font.family"] = "serif"
 
 
-def read_music(columns, n):
-    data = pd.read_csv("data/amazon_with_genres.csv").head(n)
-    data = data[columns + ["weight"]]
-    data["weight"] = data["weight"].astype(int)
+def read_yelp(columns, n):
+    data = pd.read_csv("data/yelp_business_sorted.csv").head(n)
+    data = data[columns + ["review_count"]]
+    data["weight"] = data["review_count"].astype(int)
+    data = data.drop(columns=["review_count"])
     return data
 
 
@@ -47,145 +48,96 @@ def build_demands(dic, numgroups, distribution="random"):
 
 
 all_columns = [
-    "Disco",
-    "Easy Listening",
-    "Celtic",
-    "Swing Jazz",
-    "Pop",
-    "Contemporary Folk",
-    "Latin Music",
-    "Mambo",
-    "Contemporary R&B",
-    "Norteno",
-    "Avant Garde & Free Jazz",
-    "New Age",
-    "Environmental",
-    "Latin Christian",
-    "Christmas",
-    "Singer-Songwriters",
-    "Australia & New Zealand",
-    "Vocal Jazz",
-    "Poetry",
-    "Bass",
-    "Dance Pop",
-    "Opera & Vocal",
-    "Turntablists",
-    "North America",
-    "Smooth Jazz",
-    "Modern Postbebop",
-    "Gospel",
-    "Alt-Country & Americana",
-    "Adult Alternative",
-    "Big Band",
-    "Blues",
-    "Soft Rock",
-    "Funk",
-    "Cabaret",
-    "Hardcore & Punk",
-    "Jam Bands",
-    "Techno",
-    "Country Gospel",
-    "Roots Rock",
-    "Holiday",
-    "Alternative Metal",
-    "Euro Pop",
-    "Oldies",
-    "Far East & Asia",
-    "Traditional Folk",
-    "Praise & Worship",
-    "Country",
-    "Death Metal",
-    "Children 's",
-    "Hanukkah",
-    "West Coast",
-    "New Orleans Jazz",
-    "Children 's Music",
-    "International",
-    "Caribbean & Cuba",
-    "Reggaeton",
-    "Educational",
-    "Southern Rock",
-    "Meditation",
-    "Outlaw & Progressive Country",
-    "Blues Rock",
-    "R&B",
-    "Reggae",
-    "Trip-Hop",
-    "Soul",
-    "Experimental Rap",
-    "Acoustic Blues",
-    "Modern Blues",
-    "Jazz Fusion",
-    "Latin Pop",
-    "Classic R&B",
-    "Rap & Hip-Hop",
-    "Comedy",
-    "Trance",
-    "Vocal Pop",
-    "Alternative Rock",
-    "Drum & Bass",
-    "Country & Bluegrass",
-    "Exercise",
-    "Pop Rock",
-    "Soul-Jazz & Boogaloo",
-    "Classical",
-    "Honky-Tonk",
-    "Rock",
-    "Traditional Jazz & Ragtime",
-    "Traditional Country",
-    "Latin Rock",
-    "6:14",
-    "Classic Rock",
-    "Progressive",
-    "Country Rock",
-    "Traditional British & Celtic Folk",
-    "Electric Blues Guitar",
-    "Contemporary Blues",
-    "House",
-    "American Alternative",
-    "Broadway & Vocalists",
-    "Christian",
-    "Pop Rap",
-    "Latin Hip-Hop",
-    "Gangsta & Hardcore",
-    "Adult Contemporary",
-    "New Wave & Post-Punk",
-    "Lullabies",
-    "Dubstep",
-    "Oldies & Retro",
-    "Folk Rock",
-    "Bebop",
-    "Neo-Soul",
-    "Hard Rock",
-    "Traditional Vocal Pop",
-    "6:05",
-    "Sound Effects",
-    "Dance & Electronic",
-    "Soundtracks",
-    "Bluegrass",
-    "Jazz",
-    "Alternative",
-    "Miscellaneous",
-    "Thrash & Speed Metal",
-    "Southern Rap",
-    "Spoken Word & Interviews",
-    "Electronica",
-    "International Rap",
-    "Cowboy",
-    "Salsa",
-    "Banda",
-    "Europe",
-    "Rap Rock",
-    "Goth & Industrial",
-    "Middle East",
-    "Contemporary Country",
-    "Folk",
-    "Hard Rock & Metal",
-    "Old School",
-    "India & Pakistan",
-    "East Coast",
-    "Christian Contemporary Music",
-    "Indie & Lo-Fi",
+    "Restaurants",
+    "Food",
+    "Shopping",
+    "Home Services",
+    "Beauty & Spas",
+    "Nightlife",
+    "Health & Medical",
+    "Local Services",
+    "Bars",
+    "Automotive",
+    "Event Planning & Services",
+    "Sandwiches",
+    "American (Traditional)",
+    "Active Life",
+    "Pizza",
+    "Coffee & Tea",
+    "Fast Food",
+    "Breakfast & Brunch",
+    "American (New)",
+    "Hotels & Travel",
+    "Home & Garden",
+    "Fashion",
+    "Burgers",
+    "Arts & Entertainment",
+    "Auto Repair",
+    "Hair Salons",
+    "Nail Salons",
+    "Mexican",
+    "Italian",
+    "Specialty Food",
+    "Doctors",
+    "Pets",
+    "Real Estate",
+    "Seafood",
+    "Fitness & Instruction",
+    "Professional Services",
+    "Hair Removal",
+    "Desserts",
+    "Chinese",
+    "Bakeries",
+    "Grocery",
+    "Salad",
+    "Hotels",
+    "Chicken Wings",
+    "Cafes",
+    "Ice Cream & Frozen Yogurt",
+    "Caterers",
+    "Pet Services",
+    "Dentists",
+    "Skin Care",
+    "Venues & Event Spaces",
+    "Tires",
+    "Wine & Spirits",
+    "Beer",
+    "Delis",
+    "Oil Change Stations",
+    "Waxing",
+    "Contractors",
+    "Women's Clothing",
+    "Massage",
+    "Sports Bars",
+    "Day Spas",
+    "General Dentistry",
+    "Education",
+    "Flowers & Gifts",
+    "Auto Parts & Supplies",
+    "Apartments",
+    "Convenience Stores",
+    "Home Decor",
+    "Gyms",
+    "Japanese",
+    "Pubs",
+    "Cocktail Bars",
+    "Sushi Bars",
+    "Barbeque",
+    "Juice Bars & Smoothies",
+    "Barbers",
+    "Car Dealers",
+    "Sporting Goods",
+    "Accessories",
+    "Cosmetic Dentists",
+    "Drugstores",
+    "Local Flavor",
+    "Furniture Stores",
+    "Pet Groomers",
+    "Asian Fusion",
+    "Cosmetics & Beauty Supply",
+    "Jewelry",
+    "Steakhouses",
+    "Diners",
 ]
 
 lp_construction_time_avg = []
@@ -197,13 +149,13 @@ res_lp_list_avg = []
 res_twist_list_avg = []
 
 
-range_n = range(10, 15)
+range_n = range(10, 18)
 n_values = [2**i for i in range_n]
 for n in n_values:
     print("n: ", n)
     group_cnt = 20
     columns = all_columns[0:group_cnt]
-    data = read_music(columns, n)
+    data = read_yelp(columns, n)
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
@@ -211,7 +163,7 @@ for n in n_values:
     lp_construction_time = []
     greedy_construction_time = []
     twist_construction_time = []
-    for i in range(5):
+    for i in range(1):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
         dic2 = deepcopy(dic)
@@ -254,7 +206,7 @@ vizualize(
     "Number of Records",
     "Total Weight",
     "Time (sec)",
-    "music",
+    "yelp",
     "n",
 )
 
@@ -269,12 +221,12 @@ twist_rss_avg = []
 greedy_rss_avg = []
 
 demands_org = [np.random.randint(1, 10) for col in all_columns]
-num_groups = range(3, 140, 10)
-n_size = 50000
+num_groups = range(3, 80, 10)
+n_size = 100000
 for num_group in num_groups:
     columns = all_columns[0:num_group]
     print("n_groups: ", num_group)
-    data = read_music(columns, n_size)
+    data = read_yelp(columns, n_size)
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
@@ -285,7 +237,7 @@ for num_group in num_groups:
     twist_rss = []
     greedy_rss = []
 
-    for i in range(5):
+    for i in range(1):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
         dic2 = deepcopy(dic)
@@ -335,7 +287,7 @@ vizualize(
     "Number of Groups",
     "Total Weight",
     "Time (sec)",
-    "music",
+    "yelp",
     "group",
 )
 
@@ -344,7 +296,7 @@ visualize_rss(
     lp_rss_avg,
     greedy_rss_avg,
     twist_rss_avg,
-    "music"
+    "yelp",
 )
 
 lp_construction_time_avg = []
@@ -355,12 +307,12 @@ res_lp_list_avg = []
 res_twist_list_avg = []
 
 num_group = 20
-n_size = 50000
+n_size = 100000
 distributions = ["random", "uniform", "normal", "exponential", "poisson", "zipf"]
 for dist in distributions:
     columns = all_columns[:num_group]
-    print("distributions: ", dist)
-    data = read_music(columns, n_size)
+    print("distribution: ", dist)
+    data = read_yelp(columns, n_size)
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
@@ -410,6 +362,6 @@ vizualize(
     "Distribution of Demands",
     "Total Weight",
     "Time (sec)",
-    "music",
+    "yelp",
     "distribution",
 )
