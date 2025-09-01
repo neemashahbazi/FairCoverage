@@ -1,4 +1,13 @@
-from algorithms import run_greedy, run_lp, run_twist, construct_priority_queues, vizualize, rss_demands, visualize_rss
+from algorithms import (
+    run_greedy,
+    run_lp,
+    run_twist,
+    construct_priority_queues,
+    vizualize,
+    rss_demands,
+    visualize_rss,
+    run_lp_randomized_rounding,
+)
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,15 +28,6 @@ def read_synthetic(n, n_groups):
     return data
 
 
-lp_construction_time_avg = []
-greedy_construction_time_avg = []
-twist_construction_time_avg = []
-
-res_greedy_list_avg = []
-res_lp_list_avg = []
-res_twist_list_avg = []
-
-
 def build_demands(numgroups):
     l = []
     for i in range(numgroups):
@@ -36,12 +36,15 @@ def build_demands(numgroups):
 
 
 lp_construction_time_avg = []
+lp_randomized_construction_time_avg = []
 greedy_construction_time_avg = []
 twist_construction_time_avg = []
 res_greedy_list_avg = []
 res_lp_list_avg = []
+res_lp_randomized_list_avg = []
 res_twist_list_avg = []
 lp_rss_avg = []
+lp_randomized_rss_avg = []
 twist_rss_avg = []
 greedy_rss_avg = []
 
@@ -52,11 +55,14 @@ for num_group in num_groups:
     data = read_synthetic(n_size, num_group)
     res_greedy_list = []
     res_lp_list = []
+    res_lp_randomized_list = []
     res_twist_list = []
     lp_construction_time = []
+    lp_randomized_construction_time = []
     greedy_construction_time = []
     twist_construction_time = []
     lp_rss = []
+    lp_randomized_rss = []
     twist_rss = []
     greedy_rss = []
 
@@ -74,6 +80,13 @@ for num_group in num_groups:
         lp_rss.append(rss_demands(demands, covered_demands_lp))
 
         start_time = time.time()
+        res_lp_randomized, covered_demands_lp_randomized = run_lp_randomized_rounding(data, demands)
+        end_time = time.time()
+        lp_randomized_construction_time.append(end_time - start_time)
+        res_lp_randomized_list.append(res_lp_randomized)
+        lp_randomized_rss.append(rss_demands(demands, covered_demands_lp_randomized))
+
+        start_time = time.time()
         res_twist, covered_demands_twist = run_twist(dic2, demands)
         end_time = time.time()
         twist_construction_time.append(end_time - start_time)
@@ -88,14 +101,17 @@ for num_group in num_groups:
         greedy_construction_time.append(end_time - start_time)
 
     lp_construction_time_avg.append(np.mean(lp_construction_time))
+    lp_randomized_construction_time_avg.append(np.mean(lp_randomized_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     twist_construction_time_avg.append(np.mean(twist_construction_time))
 
     res_lp_list_avg.append(np.mean(res_lp_list))
+    res_lp_randomized_list_avg.append(np.mean(res_lp_randomized_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_twist_list_avg.append(np.mean(res_twist_list))
 
     lp_rss_avg.append(np.mean(lp_rss))
+    lp_randomized_rss_avg.append(np.mean(lp_randomized_rss))
     twist_rss_avg.append(np.mean(twist_rss))
     greedy_rss_avg.append(np.mean(greedy_rss))
 
@@ -105,10 +121,12 @@ vizualize(
     res_lp_list_avg,
     res_greedy_list_avg,
     res_twist_list_avg,
+    res_lp_randomized_list_avg,
     lp_construction_time_avg,
     greedy_construction_time_avg,
     twist_construction_time_avg,
-    "Number of Groups",
+    lp_randomized_construction_time_avg,
+    "Number of Items",
     "Total Weight",
     "Time (sec)",
     "synthetic",
@@ -116,13 +134,7 @@ vizualize(
 )
 
 # Plotting the RSS values
-visualize_rss(
-    num_groups,
-    lp_rss_avg,
-    greedy_rss_avg,
-    twist_rss_avg,
-    "synthetic"
-)
+visualize_rss(num_groups, lp_rss_avg, greedy_rss_avg, twist_rss_avg, lp_randomized_rss_avg, "synthetic")
 
 num_group = 20
 n_size = num_group + 1
@@ -130,12 +142,14 @@ data = read_synthetic(n_size, num_group)
 demands = build_demands(num_group)
 dic = construct_priority_queues(data)
 res_lp, covered_lp = run_lp(data, demands)
+res_lp_randomized, covered_lp_randomized = run_lp_randomized_rounding(data, demands)
 res_twist, covered_twist = run_twist(dic, demands)
 res_greedy, covered_greedy = run_greedy(dic, demands)
-x = np.arange(num_group)
+x = np.arange(num_group) * 1.3  # Add spacing between bar groups
 
 demands = np.array(demands[:num_group])
 covered_lp = np.array(covered_lp[:num_group])
+covered_lp_randomized = np.array(covered_lp_randomized[:num_group])
 covered_twist = np.array(covered_twist[:num_group])
 covered_greedy = np.array(covered_greedy[:num_group])
 
@@ -143,12 +157,15 @@ bar_width = 0.2
 
 plt.figure(figsize=(10, 6))
 plt.rcParams.update({"font.size": 20})
-plt.bar(x - 1.5 * bar_width, demands, width=bar_width, label="Demand", color="green")
-plt.bar(x + 0.5 * bar_width, covered_twist, width=bar_width, label="(2+ε)-approx.", color="red")
-plt.bar(x + 1.5 * bar_width, covered_greedy, width=bar_width, label="Greedy", color="orange")
-plt.bar(x - 0.5 * bar_width, covered_lp, width=bar_width, label="2-approx.", color="blue")
-plt.xticks(x, [f"{i+1}" for i in range(num_group)])
-plt.xlabel("Group")
+plt.bar(x - 2 * bar_width, demands, width=bar_width, label="Demand", color="green")
+plt.bar(x - bar_width, covered_lp, width=bar_width, label="2-approx.", color="blue")
+plt.bar(x, covered_lp_randomized, width=bar_width, label="RR-LP", color="purple")
+plt.bar(x + bar_width, covered_twist, width=bar_width, label="(2+ε)-approx.", color="red")
+plt.bar(x + 2 * bar_width, covered_greedy, width=bar_width, label="Greedy", color="orange")
+plt.xticks(x, [f"{i + 1}" for i in range(num_group)])
+plt.xlabel("Item ID")
 plt.ylabel("Coverage")
+plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=5)
+plt.grid(True, linestyle="--", alpha=0.7)
 plt.tight_layout()
 plt.savefig("plot/synthetic_coverage_vs_demand.png", bbox_inches="tight")

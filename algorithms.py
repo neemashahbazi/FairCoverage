@@ -1,4 +1,5 @@
 import math
+import random
 from matplotlib import pyplot as plt
 import numpy as np
 from collections import defaultdict
@@ -215,7 +216,7 @@ def calc_pwl(functions, demands, all_keys):
 
         curr_x = [0]
         curr_y = [0]
-        eps = 2.0
+        eps = 4.0
         while pt < curr_size - 1:
             base_value = curr_func[pt]
             pt2 = pt + 1
@@ -319,6 +320,54 @@ def run_lp(data, demands):
     return weighted_sum + rounding_cost, cnt_covered_demands
 
 
+def randomized_rounding_scheme(all_keys, lp_vals, demands, weights, alpha=2):
+    n = len(all_keys)
+    m = len(demands)
+    demands_left = deepcopy(demands)
+    cnt_covered_demands = [0 for _ in range(m)]
+    total_cost = 0
+    scale = alpha * math.log(max(2, m))
+    probs = [min(1, lp_vals[i] * scale) for i in range(n)]
+    rounded_vals = [1 if random.random() < probs[i] else 0 for i in range(n)]
+    for i in range(n):
+        if rounded_vals[i] == 1:
+            total_cost += weights[i]
+            key = all_keys[i]
+            for j in range(m):
+                if key[j] == 1:
+                    cnt_covered_demands[j] += 1
+                    demands_left[j] = max(0, demands_left[j] - 1)
+
+    return total_cost, cnt_covered_demands
+
+
+def run_lp_randomized_rounding(data, demands, alpha=2):
+    n = len(data)
+    L = [tuple(data.iloc[i]) for i in range(n)]
+    A = np.array([row[:-1] for row in L])
+    weights = np.array([row[-1] for row in L])
+
+    model = gp.Model("Set_Cover")
+    x = [model.addVar(lb=0, ub=1, vtype=GRB.CONTINUOUS, name=f"x_{i}") for i in range(n)]
+    model.setObjective(gp.quicksum(weights[i] * x[i] for i in range(n)), GRB.MINIMIZE)
+
+    for j in range(A.shape[1]):
+        model.addConstr(gp.quicksum(A[i][j] * x[i] for i in range(n)) >= demands[j], f"demand_{j}")
+
+    model.setParam("OutputFlag", 0)
+    model.optimize()
+
+    opt_value = model.ObjVal
+    lp_vals = [x[i].X for i in range(n)]
+
+    print("LP Opt value:", opt_value)
+
+    rounding_cost, cnt_covered_demands = randomized_rounding_scheme(L, lp_vals, demands, weights, alpha=alpha)
+    print("SetCover-style randomized rounding cost:", rounding_cost)
+
+    return rounding_cost, cnt_covered_demands
+
+
 def construct_priority_queues(data):
     dic = defaultdict(list)
     h = 0
@@ -332,13 +381,14 @@ def construct_priority_queues(data):
     return dic
 
 
-def vizualize(x, y1, y2, y3, y4, y5, y6, x_lable, y_lable_1, y_lable_2, dataset, exp_type):
+def vizualize(x, y1, y2, y3, y4, y5, y6, y7, y8, x_lable, y_lable_1, y_lable_2, dataset, exp_type):
     plt.figure(figsize=(10, 6))
     plt.rcParams.update({"font.size": 20})
-    width = 0.25
-    plt.bar(np.arange(len(x)) + width, y1, width, label="2-approx.", color="blue")
-    plt.bar(np.arange(len(x)), y2, width, label="Greedy", color="orange")
-    plt.bar(np.arange(len(x)) - width, y3, width, label="(2+ϵ)-approx.", color="red")
+    width = 0.2
+    plt.bar(np.arange(len(x)) - 1.5 * width, y2, width, label="Greedy", color="orange")
+    plt.bar(np.arange(len(x)) - 0.5 * width, y3, width, label="(2+ϵ)-approx.", color="red")
+    plt.bar(np.arange(len(x)) + 1.5 * width, y1, width, label="2-approx.", color="blue")
+    plt.bar(np.arange(len(x)) + 0.5 * width, y4, width, label="RR-LP", color="purple")
 
     if exp_type == "n":
         plt.xticks(
@@ -357,9 +407,15 @@ def vizualize(x, y1, y2, y3, y4, y5, y6, x_lable, y_lable_1, y_lable_2, dataset,
 
     plt.figure(figsize=(10, 6))
     plt.rcParams.update({"font.size": 20})
-    plt.plot(x, y4, label="2-approx.", marker="o", color="blue")
-    plt.plot(x, y5, label="Greedy", marker="^", color="orange")
-    plt.plot(x, y6, label="(2+ϵ)-approx.", marker="x", color="red")
+    
+    plt.plot(x, y5, label="2-approx.", marker="o", linestyle="-",
+            linewidth=2.5, markersize=8, color="blue")
+    plt.plot(x, y6, label="Greedy", marker="^", linestyle="--",
+            linewidth=2.5, markersize=8, color="orange")
+    plt.plot(x, y7, label="(2+ϵ)-approx.", marker="x", linestyle="-.",
+            linewidth=2.5, markersize=10, color="red")
+    plt.plot(x, y8, label="RR-LP", marker="s", linestyle=":",
+         linewidth=2.5, markersize=8, color="purple")
 
     if exp_type == "n":
         plt.xticks(
@@ -368,29 +424,42 @@ def vizualize(x, y1, y2, y3, y4, y5, y6, x_lable, y_lable_1, y_lable_2, dataset,
         )
         plt.xscale("log")
         plt.yscale("log")
+        plt.xlabel(x_lable + " - log")
+        plt.ylabel(y_lable_2 + " - log")
     elif exp_type == "distribution":
         plt.xticks(np.arange(len(x)), labels=[x[i][:4] + "." for i in range(len(x))])
         plt.yscale("log")
         plt.xscale("linear")
+        plt.xlabel(x_lable)
+        plt.ylabel(y_lable_2 + " - log")
     else:
         plt.xticks(np.arange(len(x)), x)
         plt.yscale("log")
         plt.xscale("linear")
-    plt.xlabel(x_lable)
-    plt.ylabel(y_lable_2)
-    plt.grid(True)
+        plt.xlabel(x_lable)
+        plt.ylabel(y_lable_2 + " - log")
+    plt.grid(True, linestyle="--", alpha=0.7)
     # plt.legend()
     plt.savefig(f"plot/time_varying_{exp_type}_{dataset}.png", bbox_inches="tight")
 
 
-def visualize_rss(x, y1, y2, y3, dataset):
+def visualize_rss(x, y1, y2, y3, y4, dataset):
     plt.figure(figsize=(10, 6))
-    plt.rcParams.update({"font.size": 20})
-    plt.plot(x, y1, label="2-approx.", marker="o", color="blue")
-    plt.plot(x, y2, label="Greedy", marker="^", color="orange")
-    plt.plot(x, y3, label="(2+ϵ)-approx.", marker="x", color="red")
-    plt.xlabel("Number of Groups")
+    plt.rcParams.update({"font.size": 16})
+    
+    plt.plot(x, y1, label="2-approx.", marker="o", linestyle="-", 
+             linewidth=2.5, markersize=8, color="blue")
+    plt.plot(x, y2, label="Greedy", marker="^", linestyle="--", 
+             linewidth=2.5, markersize=8, color="orange")
+    plt.plot(x, y3, label="(2+ϵ)-approx.", marker="x", linestyle="-.", 
+             linewidth=2.5, markersize=10, color="red")
+    plt.plot(x, y4, label="RR-LP", marker="s", linestyle=":", 
+             linewidth=2.5, markersize=8, color="purple")
+    
+    plt.xlabel("Number of Items")
     plt.ylabel("RSS")
-    plt.grid(True)
-    # plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.7)
+    # plt.legend(loc="best", frameon=True)
+    
     plt.savefig(f"plot/rss_varying_group_{dataset}.png", bbox_inches="tight")
+    plt.close()

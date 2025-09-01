@@ -1,4 +1,13 @@
-from algorithms import run_greedy, run_lp, run_twist, construct_priority_queues, vizualize, visualize_rss, rss_demands
+from algorithms import (
+    run_greedy,
+    run_lp,
+    run_twist,
+    construct_priority_queues,
+    vizualize,
+    visualize_rss,
+    rss_demands,
+    run_lp_randomized_rounding,
+)
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,10 +19,23 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
 plt.rcParams["font.family"] = "serif"
 
 
+def build_weights(data):
+    weights = []
+    for _, row in data.iterrows():
+        count_ones = sum([1 for val in row if val == 1])
+        rnd = np.random.randint(1, 10)
+        epsilon = 1.0
+        if rnd < 2:
+            count_ones += epsilon
+        weights.append(count_ones)
+    return weights
+
+
 def read_yelp(columns, n):
     data = pd.read_csv("data/yelp_business_sorted.csv").head(n)
     data = data[columns + ["review_count"]]
     data["weight"] = data["review_count"].astype(int)
+    # data["weight"] = build_weights(data)
     data = data.drop(columns=["review_count"])
     return data
 
@@ -143,10 +165,12 @@ all_columns = [
 lp_construction_time_avg = []
 greedy_construction_time_avg = []
 twist_construction_time_avg = []
+lp_randomized_construction_time_avg = []
 
 res_greedy_list_avg = []
 res_lp_list_avg = []
 res_twist_list_avg = []
+res_lp_randomized_list_avg = []
 
 
 range_n = range(10, 18)
@@ -159,11 +183,13 @@ for n in n_values:
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
+    res_lp_randomized_list = []
 
     lp_construction_time = []
     greedy_construction_time = []
     twist_construction_time = []
-    for i in range(1):
+    lp_randomized_construction_time = []
+    for i in range(5):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
         dic2 = deepcopy(dic)
@@ -173,6 +199,12 @@ for n in n_values:
         end_time = time.time()
         lp_construction_time.append(end_time - start_time)
         res_lp_list.append(res_lp)
+
+        start_time = time.time()
+        res_lp_randomized, _ = run_lp_randomized_rounding(data, demands)
+        end_time = time.time()
+        lp_randomized_construction_time.append(end_time - start_time)
+        res_lp_randomized_list.append(res_lp_randomized)
 
         start_time = time.time()
         res_twist, _ = run_twist(dic2, demands)
@@ -189,10 +221,12 @@ for n in n_values:
     lp_construction_time_avg.append(np.mean(lp_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     twist_construction_time_avg.append(np.mean(twist_construction_time))
+    lp_randomized_construction_time_avg.append(np.mean(lp_randomized_construction_time))
 
     res_lp_list_avg.append(np.mean(res_lp_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_twist_list_avg.append(np.mean(res_twist_list))
+    res_lp_randomized_list_avg.append(np.mean(res_lp_randomized_list))
 
 
 vizualize(
@@ -200,10 +234,12 @@ vizualize(
     res_lp_list_avg,
     res_greedy_list_avg,
     res_twist_list_avg,
+    res_lp_randomized_list_avg,
     lp_construction_time_avg,
     greedy_construction_time_avg,
     twist_construction_time_avg,
-    "Number of Records",
+    lp_randomized_construction_time_avg,
+    "Number of Sets",
     "Total Weight",
     "Time (sec)",
     "yelp",
@@ -213,12 +249,15 @@ vizualize(
 lp_construction_time_avg = []
 greedy_construction_time_avg = []
 twist_construction_time_avg = []
+lp_randomized_construction_time_avg = []
 res_greedy_list_avg = []
 res_lp_list_avg = []
 res_twist_list_avg = []
+res_lp_randomized_list_avg = []
 lp_rss_avg = []
 twist_rss_avg = []
 greedy_rss_avg = []
+lp_randomized_rss_avg = []
 
 demands_org = [np.random.randint(1, 10) for col in all_columns]
 num_groups = range(3, 80, 10)
@@ -230,14 +269,17 @@ for num_group in num_groups:
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
+    res_lp_randomized_list = []
     lp_construction_time = []
     greedy_construction_time = []
     twist_construction_time = []
+    lp_randomized_construction_time = []
     lp_rss = []
     twist_rss = []
+    lp_randomized_rss = []
     greedy_rss = []
 
-    for i in range(1):
+    for i in range(5):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
         dic2 = deepcopy(dic)
@@ -249,6 +291,13 @@ for num_group in num_groups:
         lp_construction_time.append(end_time - start_time)
         res_lp_list.append(res_lp)
         lp_rss.append(rss_demands(demands, covered_demands_lp))
+
+        start_time = time.time()
+        res_lp_randomized, covered_demands_lp_randomized = run_lp_randomized_rounding(data, demands)
+        end_time = time.time()
+        lp_randomized_construction_time.append(end_time - start_time)
+        res_lp_randomized_list.append(res_lp_randomized)
+        lp_randomized_rss.append(rss_demands(demands, covered_demands_lp_randomized))
 
         start_time = time.time()
         res_twist, covered_demands_twist = run_twist(dic2, demands)
@@ -267,13 +316,16 @@ for num_group in num_groups:
     lp_construction_time_avg.append(np.mean(lp_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     twist_construction_time_avg.append(np.mean(twist_construction_time))
+    lp_randomized_construction_time_avg.append(np.mean(lp_randomized_construction_time))
     lp_rss_avg.append(np.mean(lp_rss))
     twist_rss_avg.append(np.mean(twist_rss))
     greedy_rss_avg.append(np.mean(greedy_rss))
+    lp_randomized_rss_avg.append(np.mean(lp_randomized_rss))
 
     res_lp_list_avg.append(np.mean(res_lp_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_twist_list_avg.append(np.mean(res_twist_list))
+    res_lp_randomized_list_avg.append(np.mean(res_lp_randomized_list))
 
 
 vizualize(
@@ -281,10 +333,12 @@ vizualize(
     res_lp_list_avg,
     res_greedy_list_avg,
     res_twist_list_avg,
+    res_lp_randomized_list_avg,
     lp_construction_time_avg,
     greedy_construction_time_avg,
     twist_construction_time_avg,
-    "Number of Groups",
+    lp_randomized_construction_time_avg,
+    "Number of Items",
     "Total Weight",
     "Time (sec)",
     "yelp",
@@ -296,15 +350,18 @@ visualize_rss(
     lp_rss_avg,
     greedy_rss_avg,
     twist_rss_avg,
+    lp_randomized_rss_avg,
     "yelp",
 )
 
 lp_construction_time_avg = []
 greedy_construction_time_avg = []
 twist_construction_time_avg = []
+lp_randomized_construction_time_avg = []
 res_greedy_list_avg = []
 res_lp_list_avg = []
 res_twist_list_avg = []
+res_lp_randomized_list_avg = []
 
 num_group = 20
 n_size = 100000
@@ -316,9 +373,11 @@ for dist in distributions:
     res_greedy_list = []
     res_lp_list = []
     res_twist_list = []
+    res_lp_randomized_list = []
     lp_construction_time = []
     greedy_construction_time = []
     twist_construction_time = []
+    lp_randomized_construction_time = []
     for i in range(5):
         print("run:", i + 1)
         dic = construct_priority_queues(data)
@@ -330,6 +389,12 @@ for dist in distributions:
         end_time = time.time()
         lp_construction_time.append(end_time - start_time)
         res_lp_list.append(res_lp)
+
+        start_time = time.time()
+        res_lp_randomized, covered_demands_lp_randomized = run_lp_randomized_rounding(data, demands)
+        end_time = time.time()
+        lp_randomized_construction_time.append(end_time - start_time)
+        res_lp_randomized_list.append(res_lp_randomized)
 
         start_time = time.time()
         res_twist, _ = run_twist(dic2, demands)
@@ -346,19 +411,23 @@ for dist in distributions:
     lp_construction_time_avg.append(np.mean(lp_construction_time))
     greedy_construction_time_avg.append(np.mean(greedy_construction_time))
     twist_construction_time_avg.append(np.mean(twist_construction_time))
+    lp_randomized_construction_time_avg.append(np.mean(lp_randomized_construction_time))
 
     res_lp_list_avg.append(np.mean(res_lp_list))
     res_greedy_list_avg.append(np.mean(res_greedy_list))
     res_twist_list_avg.append(np.mean(res_twist_list))
+    res_lp_randomized_list_avg.append(np.mean(res_lp_randomized_list))
 
 vizualize(
     distributions,
     res_lp_list_avg,
     res_greedy_list_avg,
     res_twist_list_avg,
+    res_lp_randomized_list_avg,
     lp_construction_time_avg,
     greedy_construction_time_avg,
     twist_construction_time_avg,
+    lp_randomized_construction_time_avg,
     "Distribution of Demands",
     "Total Weight",
     "Time (sec)",

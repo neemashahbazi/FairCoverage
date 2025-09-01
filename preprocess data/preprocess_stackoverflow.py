@@ -29,4 +29,5 @@ for col in df.columns:
         df[f"{col}_{val}"] = df[col].astype(str).apply(lambda x: int(val in [i.strip() for i in x.split(";")]))        
 
 df = df.drop(columns, axis=1)
+df = df[df.sum().sort_values(ascending=False).index]
 df.to_csv("data/preprocessed_survey_results.csv", index=False)
